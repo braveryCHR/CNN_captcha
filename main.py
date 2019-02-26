@@ -3,6 +3,7 @@ from model import *
 from train import *
 
 if __name__ == '__main__':
-    net = CaptchaNet()
+    net = ResNet(ResidualBlock)
+    net.loadIfExist()
     # print(net.named_parameters())
     train(net)

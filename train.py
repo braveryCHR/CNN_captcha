@@ -5,6 +5,9 @@ from torch import nn
 from dataset import *
 from torch.utils.data import DataLoader
 import tqdm
+from Visdom import *
+from torchnet import meter
+
 
 
 def train(model):
@@ -19,6 +22,8 @@ def train(model):
                                 shuffle=True, num_workers=4)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=learningRate)
+    vis = Visualizer(env = "ResCaptcha")
+    loss_meter = meter.AverageValueMeter()
     for epoch in range(totalEpoch):
         for circle, input in tqdm.tqdm(enumerate(trainDataLoader, 0)):
             x, label = input
@@ -31,8 +36,10 @@ def train(model):
             optimizer.zero_grad()
             y1, y2, y3, y4 = model(x)
             # print(y1.shape, y2.shape, y3.shape, y4.shape)
-            loss = criterion(y1, label1) + criterion(y2, label2) \
-                   + criterion(y3, label3) + criterion(y4, label4)
+            loss1, loss2, loss3, loss4 = criterion(y1, label1), criterion(y2, label2) \
+                , criterion(y3, label3), criterion(y4, label4)
+            loss = loss1 + loss2 + loss3 + loss4
+            loss_meter.add(loss.item())
             # print(loss)
             avgLoss += loss.item()
             loss.backward()
@@ -42,17 +49,20 @@ def train(model):
                       (circle, avgLoss / printCircle))
                 writeFile("after %d circle,the train loss is %.5f" %
                           (circle, avgLoss / printCircle))
+                vis.plot_many_stack({"train_loss": avgLoss})
                 avgLoss = 0
             if circle % testCircle == 1:
-                test(model, testDataLoader)
-        model.save(epoch)
+                accuracy = test(model, testDataLoader)
+                vis.plot_many_stack({"test_acc":accuracy})
+            if circle % saveCircle == 1:
+                model.save(str(epoch)+"_"+str(saveCircle))
 
 
 def test(model, testDataLoader):
     totalNum = testNum * batchSize
     rightNum = 0
     for circle, input in enumerate(testDataLoader, 0):
-        if circle > testNum:
+        if circle >= testNum:
             break
         x, label = input
         label = label.long()
@@ -70,6 +80,7 @@ def test(model, testDataLoader):
         rightNum += (batchSize - res)
     print("the accuracy of test set is %s" % (str(float(rightNum) / float(totalNum))))
     writeFile("the accuracy of test set is %s" % (str(float(rightNum) / float(totalNum))))
+    return float(rightNum) / float(totalNum)
 
 
 def writeFile(str):

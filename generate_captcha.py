@@ -44,4 +44,4 @@ def get_captcha(num, path):
 
 
 if __name__ == '__main__':
-    get_captcha(100, "./userTest/")
+    get_captcha(900, "./userTest/")
